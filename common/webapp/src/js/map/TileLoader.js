@@ -58,10 +58,13 @@ export class TileLoader {
         this.bufferGeometryLoader = new PRBMLoader();
     }
 
-    load = (tileX, tileZ, cancelCheck = () => false) => {
+    load = (tileX, tileZ, cancelCheck = () => false, force = false) => {
         let tileUrl = this.tilePath + pathFromCoords(tileX, tileZ) + '.prbm';
 
         return new Promise((resolve, reject) => {
+            if (force) {
+                this.revalidatedUrls.delete(tileUrl);
+            }
             this.fileLoader.setRevalidatedUrls(this.revalidatedUrls);
             this.fileLoader.load(tileUrl,
                 async data => {
