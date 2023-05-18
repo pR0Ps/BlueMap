@@ -61,12 +61,12 @@ export class LowresTileLoader {
         this.geometry.translate(tileSettings.tileSize.x / 2 + 1, 0, tileSettings.tileSize.x / 2 + 1);
     }
 
-    load = (tileX, tileZ, cancelCheck = () => false) => {
+    load = (tileX, tileZ, cancelCheck = () => false, tileCacheHash = null) => {
         let tileUrl = this.tilePath + this.lod + "/" + pathFromCoords(tileX, tileZ) + '.png';
 
         //await this.loadBlocker();
         return new Promise((resolve, reject) => {
-            this.textureLoader.load(tileUrl + '?' + this.tileCacheHash,
+            this.textureLoader.load(tileUrl + '?' + (tileCacheHash ? tileCacheHash : this.tileCacheHash),
                 async texture => {
                     texture.anisotropy = 1;
                     texture.generateMipmaps = false;

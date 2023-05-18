@@ -109,6 +109,13 @@ export class TileManager {
         this.removeAllTiles();
     }
 
+    clearTileCache(cacheHash){
+        this.tileLoader.cacheHash = cacheHash;
+        this.tiles.forEach(tile => {
+            tile.cacheHash = null;
+        })
+    }
+
     removeFarTiles() {
         this.tiles.forEach((tile, hash, map) => {
             if (

@@ -8,11 +8,14 @@ logs/
 run/
 runs/
 node_modules/
+__pycache__/
+*.egg-info/
 
 .classpath
 .project
 .idea
 
+*.py[cod]
 *.launch
 
 release.md

@@ -22,6 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+import { generateCacheHash } from "../BlueMap";
+
 export class Tile {
 
     /**
@@ -41,6 +43,7 @@ export class Tile {
 
         this.x = x;
         this.z = z;
+        this.cacheHash = null;
 
         this.unloaded = true;
         this.loading = false;
@@ -50,14 +53,17 @@ export class Tile {
      * @param tileLoader {TileLoader}
      * @returns {Promise<void>}
      */
-    load(tileLoader) {
+    load(tileLoader, force = false) {
         if (this.loading) return Promise.reject("tile is already loading!");
         this.loading = true;
+        if (force){
+            this.cacheHash = generateCacheHash();
+        }
 
         this.unload();
 
         this.unloaded = false;
-        return tileLoader.load(this.x, this.z, () => this.unloaded)
+        return tileLoader.load(this.x, this.z, () => this.unloaded, this.cacheHash)
             .then(model => {
                 if (this.unloaded){
                     Tile.disposeModel(model);

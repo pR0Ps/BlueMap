@@ -28,7 +28,7 @@ import {MapControls} from "./controls/map/MapControls";
 import {FreeFlightControls} from "./controls/freeflight/FreeFlightControls";
 import {FileLoader, MathUtils, Vector3} from "three";
 import {Map as BlueMapMap} from "./map/Map";
-import {alert, animate, EasingFunctions, generateCacheHash} from "./util/Utils";
+import {alert, animate, EasingFunctions, generateCacheHash, hashTile} from "./util/Utils";
 import {MainMenu} from "./MainMenu";
 import {PopupMarker} from "./PopupMarker";
 import {MarkerSet} from "./markers/MarkerSet";
@@ -55,6 +55,9 @@ export class BlueMapApp {
         this.playerMarkerManager = null;
         /** @type {NormalMarkerManager} */
         this.markerFileManager = null;
+
+        /** @type {WebSocket} */
+        this.websocket = null;
 
         /** @type {{
          *      version: string,
@@ -180,6 +183,7 @@ export class BlueMapApp {
         this.events.addEventListener("bluemapMapInteraction", this.mapInteraction);
 
         // start app update loop
+        this.initWebsocketUpdater();
         if(this.updateLoop) clearTimeout(this.updateLoop);
         this.updateLoop = setTimeout(this.update, 1000);
 
@@ -429,6 +433,30 @@ export class BlueMapApp {
                 alert(this.events, e, "warning");
                 this.markerFileManager.dispose();
             });
+    }
+
+    initWebsocketUpdater() {
+        if (this.websocket) {
+            this.websocket.close();
+        }
+        this.websocket = new WebSocket(`${location.protocol.replace("http", "ws")}${location.hostname}:8765`);
+        this.websocket.addEventListener("message", ({ data }) => {
+            let parsed = JSON.parse(data);
+            alert(this.events, `websocket data: ${data}`, "debug")
+
+            let map = this.mapsMap.get(parsed.world);
+            if (!map || !map.isLoaded)
+                return;
+
+            let mgr = parsed.lod > 0 ? map.lowresTileManager[parsed.lod-1] : map.hiresTileManager
+            if (!mgr.unloaded){
+                let tilehash = hashTile(parsed.x, parsed.z);
+                let tile = mgr.tiles.get(tilehash);
+                if (tile){
+                    tile.load(mgr.tileLoader, true);
+                }
+            }
+        });
     }
 
     updateControlsSettings() {

@@ -465,9 +465,9 @@ export class MapViewer {
 		this.tileCacheHash = newTileCacheHash;
 		if (this.map) {
 			for (let i = 0; i < this.map.lowresTileManager.length; i++) {
-				this.map.lowresTileManager[i].tileLoader.tileCacheHash = this.tileCacheHash;
+				this.map.lowresTileManager[i].clearTileCache(newTileCacheHash);
 			}
-			this.map.hiresTileManager.tileLoader.tileCacheHash = this.tileCacheHash;
+			this.map.hiresTileManager.clearTileCache(newTileCacheHash);
 		}
 	}
 
