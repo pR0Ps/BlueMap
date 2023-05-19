@@ -22,12 +22,16 @@ PATH_EXTRACT_RE = re.compile(
 )
 
 
+def make_tile_path(webroot, world):
+    return os.path.join(webroot, "maps", world, "tiles")
+
+
 async def serve(*, webroot, bind_address, port):
     webroot = os.path.abspath(webroot)
 
     __log__.info("Will watch webroot '%s' for changes", webroot)
 
-    if not (tile_dirs := glob.glob(os.path.join(webroot, "maps", "*", "tiles"))):
+    if not (tile_dirs := glob.glob(make_tile_path(webroot, "*"))):
         raise ValueError("No tile folders to watch found")
 
     __log__.debug("Found tile directories: %s", tile_dirs)
@@ -37,22 +41,32 @@ async def serve(*, webroot, bind_address, port):
     stop = asyncio.Event()
 
     def _stop(sig):
-        __log__.critical("Handled signal, shutting down")
+        __log__.critical("Handled signal, shutting down (send again to force)")
         stop.set()
         loop.remove_signal_handler(sig)
 
     loop.add_signal_handler(signal.SIGINT, _stop, signal.SIGINT)
     loop.add_signal_handler(signal.SIGINT, _stop, signal.SIGINT)
 
-    # Set up a websocket connection handler that just keeps track of the currently-connected clients.
-    connected = set()
+    # Set up a websocket connection handler that just keeps track of the currently-connected clients per-map.
+    connected = dict()
 
     async def handler(websocket):
-        connected.add(websocket)
+        path = websocket.path.strip("/")
+
+        if not path or make_tile_path(webroot, path) not in tile_dirs:
+            __log__.error("Client tried connect for unwatched world: '%s'", path)
+            return  # close the connection
+
+        if path not in connected:
+            connected[path] = set()
+
+        __log__.info("Client connected and subscribed to events from world: '%s'", path)
+        connected[path].add(websocket)
         try:
             await websocket.wait_closed()
         finally:
-            connected.remove(websocket)
+            connected[path].remove(websocket)
 
     __log__.debug("Starting websocket server")
     async with websockets.server.serve(handler, bind_address, port):
@@ -72,14 +86,17 @@ async def serve(*, webroot, bind_address, port):
                 __log__.debug("Detected change at path %s (%s)", path, type.name)
                 if m := PATH_EXTRACT_RE.fullmatch(relpath):
                     data = m.groupdict()
-                    for x in ("lod", "x", "z"):
-                        data[x] = int(data[x])
-
                     __log__.info(
                         "Detected change in world '%(world)s': lod=%(lod)s x=%(x)s z=%(z)s",
                         data,
                     )
-                    websockets.broadcast(connected, json.dumps(data))
+
+                    world = data.pop("world")
+                    if world in connected:
+                        websockets.broadcast(
+                            connected[world],
+                            json.dumps({k: int(v) for k, v in data.items()}),
+                        )
                 else:
                     __log__.error("Failed to extract data from path '%s'", relpath)
         __log__.debug("Stopped file watcher")

@@ -183,7 +183,6 @@ export class BlueMapApp {
         this.events.addEventListener("bluemapMapInteraction", this.mapInteraction);
 
         // start app update loop
-        this.initWebsocketUpdater();
         if(this.updateLoop) clearTimeout(this.updateLoop);
         this.updateLoop = setTimeout(this.update, 1000);
 
@@ -268,7 +267,8 @@ export class BlueMapApp {
 
         await Promise.all([
             this.initPlayerMarkerManager(),
-            this.initMarkerFileManager()
+            this.initMarkerFileManager(),
+            this.initWebsocketUpdater(),
         ]);
     }
 
@@ -439,14 +439,16 @@ export class BlueMapApp {
         if (this.websocket) {
             this.websocket.close();
         }
-        this.websocket = new WebSocket(`${location.protocol.replace("http", "ws")}${location.hostname}:8765`);
+
+        const map = this.mapViewer.map;
+        if (!map){
+            return;
+        }
+
+        this.websocket = new WebSocket(`${location.protocol.replace("http", "ws")}//${location.hostname}:8765/${map.data.id}`);
         this.websocket.addEventListener("message", ({ data }) => {
             let parsed = JSON.parse(data);
             alert(this.events, `websocket data: ${data}`, "debug")
-
-            let map = this.mapsMap.get(parsed.world);
-            if (!map || !map.isLoaded)
-                return;
 
             let mgr = parsed.lod > 0 ? map.lowresTileManager[parsed.lod-1] : map.hiresTileManager
             if (!mgr.unloaded){
@@ -456,6 +458,20 @@ export class BlueMapApp {
                     tile.load(mgr.tileLoader, true);
                 }
             }
+        });
+        this.websocket.addEventListener("close", ({code}) => {
+            if (code == 1000){
+                alert(this.events, "No websocket-based updates available for this map", "debug")
+            }
+            else if (code == 1001){
+                alert(this.events, "Lost websocket connection to server", "debug");
+            }
+            else if (code != 1005){  // 1005 happens normally when switching maps
+                alert(this.events, `Websocket closed with status code: ${code}`, "debug")
+            }
+        });
+        this.websocket.addEventListener("error", () => {
+            alert(this.events, "Failed to connect to websocket - live updates not available", "error")
         });
     }
 
