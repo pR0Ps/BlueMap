@@ -18,7 +18,7 @@ __log__ = logging.getLogger(__name__)
 
 DEBOUCE_MS = 5 * 1000  # time to wait between tile updates before re-reporting them
 PATH_EXTRACT_RE = re.compile(
-    r"maps/(?P<world>[^/]+)/tiles/(?P<lod>\d+)/x(?P<x>[-\d]+)/z(?P<z>[-\d]+)\..*"
+    r"maps/(?P<world>[^/]+)/tiles/(?P<lod>\d+)/x(?P<x>[-\d]+)/z(?P<z>[-\d]+)\.(?:png|json)(?:\.gz)?"
 )
 
 
@@ -83,7 +83,8 @@ async def serve(*, webroot, bind_address, port):
                     continue
 
                 relpath = os.path.relpath(path, start=webroot)
-                __log__.debug("Detected change at path %s (%s)", path, type.name)
+                __log__.debug("Detected change at path %s (%s)", relpath, type.name)
+
                 if m := PATH_EXTRACT_RE.fullmatch(relpath):
                     data = m.groupdict()
                     __log__.info(
@@ -98,7 +99,7 @@ async def serve(*, webroot, bind_address, port):
                             json.dumps({k: int(v) for k, v in data.items()}),
                         )
                 else:
-                    __log__.error("Failed to extract data from path '%s'", relpath)
+                    __log__.debug("Failed to extract data from path '%s'", relpath)
         __log__.debug("Stopped file watcher")
     __log__.debug("Stopped websocket server")
 
