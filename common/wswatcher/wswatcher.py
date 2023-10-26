@@ -18,7 +18,7 @@ __log__ = logging.getLogger(__name__)
 
 DEBOUCE_MS = 5 * 1000  # time to wait between tile updates before re-reporting them
 PATH_EXTRACT_RE = re.compile(
-    r"maps/(?P<world>[^/]+)/tiles/(?P<lod>\d+)/x(?P<x>[-\d]+)/z(?P<z>[-\d]+)\.(?:png|json)(?:\.gz)?"
+    r"maps/(?P<world>[^/]+)/tiles/(?P<lod>\d+)/x(?P<x>[-\d/]+)/z(?P<z>[-\d/]+)\.(?:png|json)(?:\.gz)?"
 )
 
 
@@ -87,6 +87,8 @@ async def serve(*, webroot, bind_address, port):
 
                 if m := PATH_EXTRACT_RE.fullmatch(relpath):
                     data = m.groupdict()
+                    for k in ("x", "z"):
+                        data[k] = data[k].replace("/", "")
                     __log__.info(
                         "Detected change in world '%(world)s': lod=%(lod)s x=%(x)s z=%(z)s",
                         data,
