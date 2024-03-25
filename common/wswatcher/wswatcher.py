@@ -18,7 +18,7 @@ __log__ = logging.getLogger(__name__)
 
 DEBOUCE_MS = 5 * 1000  # time to wait between tile updates before re-reporting them
 PATH_EXTRACT_RE = re.compile(
-    r"maps/(?P<world>[^/]+)/tiles/(?P<lod>\d+)/x(?P<x>[-\d/]+)/z(?P<z>[-\d/]+)\.(?:png|json)(?:\.gz)?"
+    r"maps/(?P<world>[^/]+)/tiles/(?P<lod>\d+)/x(?P<x>[-\d/]+)/z(?P<z>[-\d/]+)\.(?:png|json|prbm)(?:\.gz)?"
 )
 
 
