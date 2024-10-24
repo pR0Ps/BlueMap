@@ -16,7 +16,7 @@ setup(
     },
     python_requires=">=3.8.0",
     install_requires=[
-        "watchfiles>=0.19.0,<0.22.0",
-        "websockets>=11.0.3,<13.0.0",
+        "watchfiles>=0.19.0,<0.25.0",
+        "websockets>=11.0.3,<14.0.0",
     ],
 )
