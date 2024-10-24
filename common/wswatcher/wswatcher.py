@@ -10,8 +10,7 @@ import re
 import signal
 
 import watchfiles
-import websockets
-import websockets.server
+from websockets.asyncio.server import serve as ws_server, broadcast as ws_broadcast
 
 
 __log__ = logging.getLogger(__name__)
@@ -52,7 +51,7 @@ async def serve(*, webroot, bind_address, port):
     connected = dict()
 
     async def handler(websocket):
-        path = websocket.path.strip("/")
+        path = websocket.request.path.strip("/")
 
         if not path or make_tile_path(webroot, path) not in tile_dirs:
             __log__.error("Client tried connect for unwatched world: '%s'", path)
@@ -69,7 +68,7 @@ async def serve(*, webroot, bind_address, port):
             connected[path].remove(websocket)
 
     __log__.debug("Starting websocket server")
-    async with websockets.server.serve(handler, bind_address, port):
+    async with ws_server(handler, bind_address, port):
         __log__.debug("Starting file watcher")
         async for changes in watchfiles.awatch(
             *tile_dirs,
@@ -96,7 +95,7 @@ async def serve(*, webroot, bind_address, port):
 
                     world = data.pop("world")
                     if world in connected:
-                        websockets.broadcast(
+                        ws_broadcast(
                             connected[world],
                             json.dumps({k: int(v) for k, v in data.items()}),
                         )
