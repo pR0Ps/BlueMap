@@ -463,7 +463,7 @@ export class BlueMapApp {
             if (!mgr.unloaded){
                 let tilehash = hashTile(parsed.x, parsed.z);
                 let tile = mgr.tiles.get(tilehash);
-                if (tile){
+                if (tile && !tile.loading){
                     tile.load(mgr.tileLoader, true);
                 }
             }
