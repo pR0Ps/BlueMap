@@ -24,9 +24,12 @@
  */
 package de.bluecolored.bluemap.common.web.http;
 
+import org.jetbrains.annotations.Nullable;
+
 @FunctionalInterface
 public interface HttpRequestHandler {
 
+    @Nullable
     HttpResponse handle(HttpRequest request);
 
 }

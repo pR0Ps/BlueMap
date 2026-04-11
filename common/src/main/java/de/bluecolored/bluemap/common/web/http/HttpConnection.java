@@ -25,9 +25,7 @@
 package de.bluecolored.bluemap.common.web.http;
 
 import de.bluecolored.bluemap.core.logger.Logger;
-import lombok.RequiredArgsConstructor;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -45,7 +43,7 @@ public class HttpConnection implements Runnable {
         this.socket = socket;
         this.requestHandler = requestHandler;
 
-        this.requestIn = new HttpRequestInputStream(new BufferedInputStream(socket.getInputStream()), socket.getInetAddress());
+        this.requestIn = new HttpRequestInputStream(socket);
         this.responseOut = new HttpResponseOutputStream(new BufferedOutputStream(socket.getOutputStream()));
     }
 
@@ -54,9 +52,9 @@ public class HttpConnection implements Runnable {
             while (socket.isConnected() && !socket.isClosed() && !socket.isInputShutdown() && !socket.isOutputShutdown()) {
                 HttpRequest request = requestIn.read();
                 if (request == null) continue;
-
                 try (HttpResponse response = requestHandler.handle(request)) {
-                    responseOut.write(response);
+                    if (response != null)
+                        responseOut.write(response);
                 }
             }
         } catch (EOFException | SocketTimeoutException ignore) {

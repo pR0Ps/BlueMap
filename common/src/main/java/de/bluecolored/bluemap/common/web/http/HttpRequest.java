@@ -28,8 +28,10 @@ import lombok.*;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HttpRequest implements HttpHeaderCarrier {
 
+    private @NonNull Socket socket;
     private @NonNull InetAddress source;
     private @NonNull String method;
     private @NonNull String path;
@@ -78,6 +81,20 @@ public class HttpRequest implements HttpHeaderCarrier {
 
     public InputStream getBodyStream() {
         return new ByteArrayInputStream(body);
+    }
+
+    public WebSocketConnection getWebSocket(){
+        if (
+            hasHeaderValue("connection", "upgrade")
+            && hasHeaderValue("upgrade", "websocket")
+        ) {
+            try {
+                return WebSocketConnection.upgrade(socket, this);
+            } catch (IOException ignored){
+                // failed to upgrade connection
+            }
+        }
+        return null;
     }
 
 }

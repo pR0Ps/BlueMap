@@ -28,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
@@ -37,6 +38,7 @@ public class HttpRequestInputStream implements Closeable {
 
     private static final Pattern REQUEST_PATTERN = Pattern.compile("^(\\w+) (\\S+) (.+)$");
 
+    private final Socket socket;
     private final InetAddress source;
     private final DataInputStream in;
     private final Reader reader;
@@ -44,9 +46,10 @@ public class HttpRequestInputStream implements Closeable {
     private byte[] byteBuffer = new byte[1024];
     private final char[] charBuffer = new char[1];
 
-    public HttpRequestInputStream(InputStream in, InetAddress source) {
-        this.source = source;
-        this.in = new DataInputStream(in);
+    public HttpRequestInputStream(Socket socket) throws IOException {
+        this.socket = socket;
+        this.source = socket.getInetAddress();
+        this.in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
         this.reader = new InputStreamReader(this.in, StandardCharsets.UTF_8);
     }
 
@@ -61,6 +64,7 @@ public class HttpRequestInputStream implements Closeable {
         URI address = URI.create(m.group(2));
 
         HttpRequest request = new HttpRequest(
+                socket,
                 source,
                 m.group(1),
                 address.getPath()
