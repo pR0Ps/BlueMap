@@ -28,7 +28,7 @@ import {MapControls} from "./controls/map/MapControls";
 import {FreeFlightControls} from "./controls/freeflight/FreeFlightControls";
 import {MathUtils, Vector3} from "three";
 import {Map as BlueMapMap} from "./map/Map";
-import {alert, animate, EasingFunctions, hashTile} from "./util/Utils";
+import {alert, animate, EasingFunctions, hashTile, httpToWebsocketUrl} from "./util/Utils";
 import {MainMenu} from "./MainMenu";
 import {PopupMarker} from "./PopupMarker";
 import {MarkerSet} from "./markers/MarkerSet";
@@ -450,19 +450,20 @@ export class BlueMapApp {
         }
 
         const map = this.mapViewer.map;
-        if (!map){
-            return;
-        }
+        if (!map) return;
 
-        this.websocket = new WebSocket(`${location.protocol.replace("http", "ws")}//${location.hostname}:8765/${map.data.id}`);
+        const wsUrl = httpToWebsocketUrl(map.data.liveDataRoot + "/live/tileupdates");
+        if (!wsUrl) return;
+
+        this.websocket = new WebSocket(wsUrl);
         this.websocket.addEventListener("message", ({ data }) => {
-            let parsed = JSON.parse(data);
-            alert(this.events, `websocket data: ${data}`, "debug")
+            alert(this.events, `tile update: ${data}`, "debug")
+            const parsed = JSON.parse(data);
 
-            let mgr = parsed.lod > 0 ? map.lowresTileManager[parsed.lod-1] : map.hiresTileManager
+            const mgr = parsed.lod > 0 ? map.lowresTileManager[parsed.lod-1] : map.hiresTileManager
             if (!mgr.unloaded){
-                let tilehash = hashTile(parsed.x, parsed.z);
-                let tile = mgr.tiles.get(tilehash);
+                const tilehash = hashTile(parsed.x, parsed.y);
+                const tile = mgr.tiles.get(tilehash);
                 if (tile && !tile.loading){
                     tile.load(mgr.tileLoader, true);
                 }
@@ -480,7 +481,7 @@ export class BlueMapApp {
             }
         });
         this.websocket.addEventListener("error", () => {
-            alert(this.events, "Failed to connect to websocket - live updates not available", "error")
+            alert(this.events, "Failed to connect to websocket - live tile updates not available", "error")
         });
     }
 

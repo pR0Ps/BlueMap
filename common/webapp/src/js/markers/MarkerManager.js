@@ -23,7 +23,7 @@
  * THE SOFTWARE.
  */
 import {MarkerSet} from "./MarkerSet";
-import {alert} from "../util/Utils";
+import {alert, httpToWebsocketUrl} from "../util/Utils";
 import {RevalidatingFileLoader} from "../util/RevalidatingFileLoader";
 
 /**
@@ -47,34 +47,77 @@ export class MarkerManager {
 
         /** @type {NodeJS.Timeout} */
         this._updateInterval = null;
+        /** @type {WebSocket|null} */
+        this._websocket = null;
     }
 
     /**
      * Sets the automatic-update frequency, setting this to 0 or negative disables automatic updates (default).
-     * This is better than using setInterval() on update() because this will wait for the update to finish before requesting the next update.
-     * @param ms - interval in milliseconds
+     * First attempts to use a WebSocket at the fileUrl for event-driven updates; falls back to polling if the
+     * connection cannot be established or fails.
+     * @param ms - polling fallback interval in milliseconds
      */
     setAutoUpdateInterval(ms) {
         if (this._updateInterval) clearTimeout(this._updateInterval);
-        if (ms > 0) {
-            let autoUpdate = () => {
-                if (this.disposed) return;
-                this.update()
-                    .then(success => {
-                        if (success) {
-                            this._updateInterval = setTimeout(autoUpdate, ms);
-                        } else {
-                            this._updateInterval = setTimeout(autoUpdate, Math.max(ms, 1000 * 15));
-                        }
-                    })
-                    .catch(e => {
-                        alert(this.events, e, "warning");
-                        this._updateInterval = setTimeout(autoUpdate, Math.max(ms, 1000 * 15));
-                    });
-            };
-
-            this._updateInterval = setTimeout(autoUpdate, ms);
+        if (this._websocket) {
+            this._websocket.close();
+            this._websocket = null;
         }
+
+        if (ms <= 0) return;
+
+        // try websocket first if possible, fall back to http polling
+        const wsUrl = httpToWebsocketUrl(this.fileUrl);
+        if (!wsUrl){
+            this._startPolling(ms);
+            return;
+        }
+
+        let opened = false;
+        const ws = new WebSocket(wsUrl);
+        this._websocket = ws;
+
+        ws.addEventListener("open", () => {opened = true;});
+        ws.addEventListener("message", ({data}) => {
+            if (this.disposed) return;
+            try {
+                this.updateFromData(JSON.parse(data));
+            }
+            catch (e){
+                alert(this.events, e, "warning");
+                this.clear()
+            }
+        });
+        ws.addEventListener("close", () => {
+            if (this._websocket !== ws) return;  // superseded by a later call
+            if (!opened && !this.disposed) {
+                this._websocket = null;
+                this._startPolling(ms);
+            }
+        });
+    }
+
+    /**
+     * @private
+     */
+    _startPolling(ms) {
+        let autoUpdate = () => {
+            if (this.disposed) return;
+            this.update()
+                .then(success => {
+                    if (success) {
+                        this._updateInterval = setTimeout(autoUpdate, ms);
+                    } else {
+                        this._updateInterval = setTimeout(autoUpdate, Math.max(ms, 1000 * 15));
+                    }
+                })
+                .catch(e => {
+                    alert(this.events, e, "warning");
+                    this._updateInterval = setTimeout(autoUpdate, Math.max(ms, 1000 * 15));
+                });
+        };
+
+        this._updateInterval = setTimeout(autoUpdate, ms);
     }
 
     /**

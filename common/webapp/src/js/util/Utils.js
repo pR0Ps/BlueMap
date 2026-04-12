@@ -139,6 +139,23 @@ export const alert = (element, message, level = "info") => {
 }
 
 /**
+ * Convert an http url to a websocket url. Non-HTTP url will return null;
+ * @param url {string}
+ * @return {string|null}
+ */
+export const httpToWebsocketUrl = url => {
+    let wsUrl;
+    try {
+        wsUrl = new URL(url, `${location.protocol}//${location.host}/`);
+        if (wsUrl.protocol.includes("http")){
+            wsUrl.protocol = wsUrl.protocol.replace("http", "ws");
+            return wsUrl.href;
+        }
+    } catch(e){};
+    return null;
+}
+
+/**
  * Source: https://stackoverflow.com/questions/494143/creating-a-new-dom-element-from-an-html-string-using-built-in-dom-methods-or-pro/35385518#35385518
  *
  * @param html {string} representing a single element
