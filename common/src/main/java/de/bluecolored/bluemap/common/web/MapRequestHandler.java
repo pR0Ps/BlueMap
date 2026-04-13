@@ -28,11 +28,15 @@ import de.bluecolored.bluemap.common.config.PluginConfig;
 import de.bluecolored.bluemap.common.live.LiveMarkersDataSupplier;
 import de.bluecolored.bluemap.common.live.LivePlayersDataSupplier;
 import de.bluecolored.bluemap.common.serverinterface.Server;
-import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
+import de.bluecolored.bluemap.common.web.http.HttpRequestHandler;
+import de.bluecolored.bluemap.common.web.http.HttpResponse;
+import de.bluecolored.bluemap.common.web.http.HttpStatusCode;
+import de.bluecolored.bluemap.common.web.http.WebSocketConnection;
 import de.bluecolored.bluemap.core.map.BmMap;
 import de.bluecolored.bluemap.core.storage.MapStorage;
-import de.bluecolored.bluemap.core.storage.Storage;
 import org.jetbrains.annotations.Nullable;
+
+import com.flowpowered.math.vector.Vector2i;
 
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -40,10 +44,34 @@ import java.util.function.Supplier;
 
 public class MapRequestHandler extends RoutingRequestHandler {
 
+    private final WebSocketConnectionManager tileUpdateConnections = new WebSocketConnectionManager();
+
     public MapRequestHandler(BmMap map, Server serverInterface, PluginConfig pluginConfig, Predicate<UUID> playerFilter) {
         this(map.getStorage(),
                 new LivePlayersDataSupplier(serverInterface, pluginConfig, map.getWorld(), playerFilter),
                 new LiveMarkersDataSupplier(map.getMarkerSets()));
+
+        // only register the handler for map updates if we're given the actual map
+        // instance from the plugin (ie. not running standalone)
+        map.getHiresModelManager().addTileUpdateListener(tile -> onTileUpdate(tile, 0));
+        map.getLowresTileManager().addTileUpdateListener((tile, lod) -> onTileUpdate(tile, lod));
+
+        register("live/tileupdates", "", (HttpRequestHandler) request -> {
+            WebSocketConnection connection = request.getWebSocket();
+            if (connection == null) return new HttpResponse(HttpStatusCode.BAD_REQUEST);
+            tileUpdateConnections.add(connection);
+            try {
+                connection.readLoop();
+            } finally {
+                tileUpdateConnections.remove(connection);
+            }
+            return null;
+        });
+    }
+
+    private void onTileUpdate(Vector2i tile, int lod) {
+        // since the data is all ints there's no escaping issues so just build the JSON the hacky fast way
+        tileUpdateConnections.broadcast("{\"x\":" + tile.getX() + ",\"y\":" + tile.getY() + ",\"lod\":" + lod + "}");
     }
 
     public MapRequestHandler(MapStorage mapStorage) {
@@ -57,15 +85,11 @@ public class MapRequestHandler extends RoutingRequestHandler {
         register(".*", new MapStorageRequestHandler(mapStorage));
 
         if (livePlayersDataSupplier != null) {
-            register("live/players\\.json", "", new JsonDataRequestHandler(
-                    new CachedRateLimitDataSupplier(livePlayersDataSupplier,1000)
-            ));
+            register("live/players\\.json", "", new LiveJsonDataRequestHandler(livePlayersDataSupplier));
         }
 
         if (liveMarkerDataSupplier != null) {
-            register("live/markers\\.json", "", new JsonDataRequestHandler(
-                    new CachedRateLimitDataSupplier(liveMarkerDataSupplier,10000)
-            ));
+            register("live/markers\\.json", "", new LiveJsonDataRequestHandler(liveMarkerDataSupplier));
         }
     }
 
